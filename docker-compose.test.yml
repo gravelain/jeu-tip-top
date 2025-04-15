@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend-test:
+    build:
+      context: ./backend
+    container_name: backend_test_runner
+    environment:
+      NODE_ENV: test
+    depends_on:
+      - mongodb
+    command: ["npm", "test", "--", "--runInBand", "--coverage"]
+    networks:
+      - web
+
+  mongodb:
+    image: mongo:6.0
+    container_name:  mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: tip_top_game_test
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge

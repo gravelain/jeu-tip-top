@@ -1,0 +1,19 @@
+FROM node:18
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier package.json et package-lock.json (si présent) pour que les dépendances soient installées
+COPY package*.json ./
+
+# Installer les dépendances, y compris recharts
+RUN npm install
+
+# Copier tous les fichiers de l'application dans l'image Docker
+COPY . .
+
+# Exposer le port si nécessaire (par défaut 4200 pour React)
+EXPOSE 4200
+
+# Commande pour démarrer l'application
+CMD ["npm", "start"]

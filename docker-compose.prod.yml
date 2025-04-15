@@ -1,0 +1,221 @@
+services:
+  traefik:
+    image: traefik:v2.11.2
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--ping=true"
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesResolvers.myresolver.acme.email=thierry.temgoua98@gmail.com"
+      - "--certificatesResolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesResolvers.myresolver.acme.httpChallenge.entryPoint=web"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
+    networks:
+      - web
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: tip_top_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.prod
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.dsp5-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=4000"
+    networks:
+      - web
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - REACT_APP_API_URL='https://api.dsp5-archi-f24a-15m-g3.fr/api'
+    container_name: tip_top_frontend
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env.prod
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`dsp5-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    networks:
+      - web
+
+  mongodb:
+    image: mongo:6.0
+    container_name: tip_top_mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: tip_top_game
+    volumes:
+      - db_data:/data/db
+    networks:
+      - web
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mongoexpress.rule=Host(`no-set`)"
+      - "traefik.http.routers.mongoexpress.entrypoints=websecure"
+      - "traefik.http.routers.mongoexpress.tls.certresolver=myresolver"
+      - "traefik.http.services.mongoexpress.loadbalancer.server.port=8081"
+    networks:
+      - web
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    platform: linux/amd64
+    container_name: jenkins
+    restart: unless-stopped
+    user: root
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jenkins.rule=Host(`jenkins.wk-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.jenkins.entrypoints=websecure"
+      - "traefik.http.routers.jenkins.tls.certresolver=myresolver"
+      - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+    networks:
+      - web
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.wk-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=myresolver"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    depends_on:
+      - jenkins
+    networks:
+      - web
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.wk-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=myresolver"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    networks:
+      - web
+
+  sonarqube_db:
+    image: postgres:latest
+    platform: linux/amd64
+    container_name: sonarqube_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+    networks:
+      - web
+
+  sonarqube:
+    image: sonarqube:latest
+    platform: linux/amd64
+    container_name: sonarqube
+    restart: unless-stopped
+    environment:
+      SONARQUBE_JDBC_URL: jdbc:postgresql://sonarqube_db:5432/sonarqube
+      SONARQUBE_JDBC_USERNAME: sonar
+      SONARQUBE_JDBC_PASSWORD: sonar
+    depends_on:
+      - sonarqube_db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarqube.rule=Host(`sonarqube.wk-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.sonarqube.entrypoints=websecure"
+      - "traefik.http.routers.sonarqube.tls.certresolver=myresolver"
+      - "traefik.http.services.sonarqube.loadbalancer.server.port=9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - web
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    platform: linux/amd64
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - web
+
+volumes:
+  db_data:
+  jenkins_data:
+  grafana_data:
+  prometheus_data:
+  sonarqube_data:
+  sonarqube_db_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  letsencrypt:
+
+networks:
+  web:
+    driver: bridge

@@ -1,0 +1,226 @@
+// pipeline {
+//   agent any
+
+//   environment {
+//     NODE_ENV = 'test'
+//     SONARQUBE_URL = 'https://www.sonarqube.dsp5-archi-f24a-15m-g8.fr'
+//     VPS_USER = 'root'
+//     VPS_HOST = '161.97.76.223'
+//     REMOTE_PROJECT_PATH = '/root/PROJET/THETIPTOP_GAME'
+//     SYSTEM_DEBUG = 'true'
+//   }
+
+//   stages {
+//     stage('Checkout Code') {
+//       steps {
+//         script {
+//           checkout([
+//             $class: 'GitSCM',
+//             branches: [[name: "*/${env.BRANCH_NAME}"]],
+//             extensions: [[$class: 'CleanBeforeCheckout']],
+//             userRemoteConfigs: [[url: 'https://github.com/Acharaf-Dev/THETIPTOP_GAME.git']]
+//           ])
+
+//           switch (env.BRANCH_NAME) {
+//             case 'main':
+//               echo "🔴 Déploiement en Production"
+//               env.DOCKER_IMAGE = "thetiptop_game/backend:prod-${GIT_COMMIT}"
+//               break
+//             case 'preprod':
+//               echo "🟡 Déploiement en Préproduction"
+//               env.DOCKER_IMAGE = "thetiptop_game/backend:preprod-${GIT_COMMIT}"
+//               break
+//             case 'develop':
+//             case 'test':
+//             case 'testunit':
+//               echo "🟢 Branche de test/développement"
+//               env.DOCKER_IMAGE = "thetiptop_game/backend:dev-${GIT_COMMIT}"
+//               break
+//             default:
+//               error "❌ Branche non supportée : ${env.BRANCH_NAME}"
+//           }
+//         }
+//       }
+//     }
+
+//     stage('Run Backend Tests on VPS') {
+//       steps {
+//         sshagent(['vps-ssh-key']) {
+//           sh """
+//             echo "🚀 Connexion SSH à ${VPS_HOST} pour exécuter les tests..."
+//             ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} << EOF
+//               cd ${REMOTE_PROJECT_PATH}
+//               docker compose exec -T backend npm run test -- --coverage --verbose
+//             //   sh 'docker-compose exec backend npm run test -- --coverage --verbose'
+
+//             EOF
+//           """
+//         }
+//       }
+//     }
+
+//     stage('SonarQube Analysis') {
+//       steps {
+//         withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+//           sshagent(['vps-ssh-key']) {
+//             sh """
+//               echo "🧼 Lancement de l'analyse SonarQube avec fichier sonar-project.properties..."
+//               ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} << EOF
+//                 cd ${REMOTE_PROJECT_PATH}/backend
+//                 /opt/sonar-scanner/bin/sonar-scanner -Dsonar.token=${SONAR_TOKEN}
+//               EOF
+//             """
+//           }
+//         }
+//       }
+//     }
+
+//     stage('Deploy on VPS') {
+//       when {
+//         branch 'main'
+//       }
+//       steps {
+//         sshagent(['vps-ssh-key']) {
+//           sh """
+//             ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} << EOF
+//               cd ${REMOTE_PROJECT_PATH}
+//               docker compose pull
+//               docker compose up -d --force-recreate
+//             EOF
+//           """
+//         }
+//       }
+//     }
+//   }
+
+//   post {
+//     success {
+//       echo '✅ Pipeline terminé avec succès.'
+//     }
+//     failure {
+//       echo '❌ Pipeline échoué. Vérifie les erreurs.'
+//     }
+//   }
+// }
+
+
+pipeline {
+    agent any
+
+    environment {
+        NODE_ENV = 'test'
+        SONARQUBE_URL = 'http://sonarqube:9000'
+        SONARQUBE_TOKEN = credentials('sonarqube-token')
+        VPS_USER = 'root'
+        VPS_HOST = '161.97.76.223'
+        REMOTE_PROJECT_PATH = '/root/PROJET/THETIPTOP_GAME'
+        SYSTEM_DEBUG = 'true'
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                script {
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${env.BRANCH_NAME}"]],
+                        extensions: [[$class: 'CleanBeforeCheckout']],
+                        userRemoteConfigs: [[url: 'https://github.com/Acharaf-Dev/THETIPTOP_GAME.git']]
+                    ])
+
+                    switch (env.BRANCH_NAME) {
+                        case 'main':
+                            echo "🔴 Déploiement en Production"
+                            env.DOCKER_IMAGE = "thetiptop_game/backend:prod-${GIT_COMMIT}"
+                            break
+                        case 'preprod':
+                            echo "🟡 Déploiement en Préproduction"
+                            env.DOCKER_IMAGE = "thetiptop_game/backend:preprod-${GIT_COMMIT}"
+                            break
+                        case 'develop':
+                        case 'test':
+                        case 'testunit':
+                            echo "🟢 Branche de test/développement"
+                            env.DOCKER_IMAGE = "thetiptop_game/backend:dev-${GIT_COMMIT}"
+                            break
+                        default:
+                            error "❌ Branche non supportée : ${env.BRANCH_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Start Containers on VPS') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'vps-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+                    sh """
+                        chmod 600 \$SSH_KEY
+                        echo "🚀 Connecting to VPS..."
+                        ssh -i \$SSH_KEY -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} 'bash -s' <<EOF
+                            set -ex
+                            echo "✅ Connected to VPS"
+                            cd ${REMOTE_PROJECT_PATH}
+                            docker compose pull
+                            docker compose up -d --force-recreate
+                        EOF
+                    """
+                }
+            }
+        }
+
+        stage('Run Backend Tests + Coverage') {
+            steps {
+                dir('backend') {
+                    // Exécuter les tests avec jest dans le backend
+                    sh './node_modules/.bin/jest --runInBand --coverage --verbose'
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir('backend') {
+                    // Exécuter SonarQube avec le bon fichier de couverture
+                    sh """
+                        ./node_modules/.bin/sonar-scanner \
+                        -Dsonar.projectKey=thetiptop_game \
+                        -Dsonar.sources=. \
+                        -Dsonar.tests=./tests \
+                        -Dsonar.testExecutionReportPaths=coverage/lcov.info \
+                        -Dsonar.host.url=${SONARQUBE_URL} \
+                        -Dsonar.login=${SONARQUBE_TOKEN}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy on VPS') {
+            when {
+                branch 'main'
+            }
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'vps-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+                    sh """
+                        chmod 600 \$SSH_KEY
+                        echo "🚚 Deploying to VPS..."
+                        ssh -i \$SSH_KEY -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} 'bash -s' <<EOF
+                            set -ex
+                            cd ${REMOTE_PROJECT_PATH}
+                            docker compose pull
+                            docker compose up -d --force-recreate
+                        EOF
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline terminé avec succès.'
+        }
+        failure {
+            echo '❌ Pipeline échoué. Vérifie les erreurs.'
+        }
+    }
+}

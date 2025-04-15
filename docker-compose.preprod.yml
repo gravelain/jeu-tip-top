@@ -1,0 +1,109 @@
+services:
+  traefik:
+    image: traefik:v2.11.2
+    container_name: traefik-preprod
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--ping=true"
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesResolvers.myresolver.acme.email=thierry.temgoua98@gmail.com"
+      - "--certificatesResolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesResolvers.myresolver.acme.httpChallenge.entryPoint=web"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
+    networks:
+      - web
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.preprod
+    container_name: tip_top_backend_preprod
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.preprod
+    environment:
+      - NODE_ENV=preproduction
+    depends_on:
+      - mongodb
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`preprod.dsp5-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=4000"
+    networks:
+      - web
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.preprod
+      args:
+        - REACT_APP_API_URL=https://preprod.dsp5-archi-f24a-15m-g3.fr/api
+    container_name: tip_top_frontend_preprod
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env.preprod
+    environment:
+      - NODE_ENV=preproduction
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`preprod.dsp5-archi-f24a-15m-g3.fr`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    networks:
+      - web
+
+  mongodb:
+    image: mongo:6.0
+    container_name: tip_top_mongodb_preprod
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: tip_top_game
+    volumes:
+      - db_data:/data/db
+    networks:
+      - web
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express-preprod
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mongoexpress.rule=Host(`no-set`)"
+      - "traefik.http.routers.mongoexpress.entrypoints=websecure"
+      - "traefik.http.routers.mongoexpress.tls.certresolver=myresolver"
+      - "traefik.http.services.mongoexpress.loadbalancer.server.port=8081"
+    networks:
+      - web
+
+volumes:
+  db_data:
+  letsencrypt:
+
+networks:
+  web:
+    driver: bridge

@@ -1,0 +1,268 @@
+/* Game Component Styles */
+.gameContainer {
+    text-align: center;
+    background-color: #f9fafb; /* Lighter page background */
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 2rem;
+}
+
+/* Slot Machine Styling - Updated Colors */
+.slotMachine {
+    width: 350px; /* Slightly wider */
+    height: auto;
+    background: linear-gradient(to bottom, #e5e7eb, #d1d5db); /* Light grey gradient */
+    border: 8px solid #6b7280; /* Darker grey border */
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), inset 0 -5px 10px rgba(0, 0, 0, 0.15);
+    margin-bottom: 2.5rem; /* More space below */
+    position: relative;
+    overflow: visible; /* Allow lever to stick out */
+    padding: 15px;
+}
+
+/* Optional: Add a top banner like the reference image */
+.machineBanner {
+    background-color: #facc15; /* Yellow */
+    color: #dc2626; /* Red text */
+    font-size: 2rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px 0;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 3px solid #ca8a04; /* Darker yellow border */
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+    letter-spacing: 2px;
+}
+
+.reelsContainer {
+    background-color: #374151; /* Dark grey background for reels area */
+    display: flex;
+    padding: 12px;
+    gap: 10px;
+    border-radius: 5px;
+    border: 2px solid #1f2937; /* Even darker border */
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.4);
+}
+
+.reel {
+    flex: 1;
+    height: 100px;
+    background-color: #f9fafb; /* Very light grey reel background */
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #9ca3af; /* Medium grey border for each reel window */
+}
+
+.reelItems {
+    position: absolute;
+    width: 100%;
+    left: 0;
+}
+
+.reelItem {
+    height: 100px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-bottom: none; /* Remove dashed line */
+    font-weight: 600; /* Slightly less bold */
+    padding: 5px;
+    text-align: center;
+    color: #1f2937; /* Darker text color */
+    background-color: transparent; /* Use reel background */
+    /* Add subtle top/bottom shadow for depth */
+    box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.5), inset 0 -2px 2px rgba(0, 0, 0, 0.1);
+}
+
+.reelEmoji {
+    font-size: 3rem; /* Slightly larger emoji */
+    margin-bottom: 0.1rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); /* Subtle shadow */
+}
+
+.reelText {
+    font-size: 0.7rem; /* Smaller text */
+    line-height: 1.1;
+    white-space: normal;
+    max-width: 95%;
+    color: #4b5563; /* Medium grey text color */
+}
+
+/* Animation for spinning reels */
+@keyframes spin {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(-100px);
+    }
+}
+
+/* Machine Bottom - Simplified */
+.machineBottom {
+    height: 20px; /* Reduced height */
+    background: #9ca3af; /* Medium grey */
+    border-radius: 0 0 8px 8px;
+    margin-top: 10px;
+    border-top: 3px solid #4b5563;
+}
+
+/* Lever Styling - Metallic */
+.lever {
+    position: absolute;
+    right: -45px; /* Position outside the main body */
+    top: 50%;
+    transform: translateY(-60%); /* Center vertically relative to reels */
+    width: 25px;
+    height: 150px;
+    z-index: -1; /* Behind main body slightly if needed */
+}
+
+.leverBase {
+    position: absolute;
+    bottom: 0;
+    width: 45px; /* Wider base */
+    height: 45px;
+    left: -10px; /* Center the base */
+    background: radial-gradient(circle, #d1d5db, #9ca3af); /* Metallic gradient */
+    border-radius: 50%;
+    border: 3px solid #4b5563;
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.3);
+}
+
+.leverHandle {
+    position: absolute;
+    width: 18px;
+    height: 110px; /* Longer handle */
+    bottom: 35px; /* Position above base */
+    left: 3.5px; /* Center on base */
+    background: linear-gradient(90deg, #e5e7eb, #f9fafb, #e5e7eb); /* Silver gradient */
+    border-radius: 9px;
+    transform-origin: bottom center;
+    transform: rotate(0deg);
+    transition: transform 0.3s ease;
+    border: 1px solid #9ca3af;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Ball on top of lever */
+.leverHandle::after {
+    content: '';
+    position: absolute;
+    top: -12px; /* Position above handle */
+    left: -6px; /* Center the ball */
+    width: 30px;
+    height: 30px;
+    background: radial-gradient(circle, #f9fafb, #9ca3af); /* Metallic ball */
+    border-radius: 50%;
+    border: 2px solid #4b5563;
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.3);
+}
+
+.leverPulled {
+    transform: rotate(50deg); /* Increased rotation */
+}
+
+/* Spin button styling */
+.spinButton {
+    margin-top: 1rem;
+    padding: 12px 30px;
+    font-size: 1.125rem;
+    cursor: pointer;
+    background-color: #14b8a6;
+    color: white;
+    border: none;
+    border-radius: 9999px;
+    transition: all 0.2s ease;
+    font-weight: 600;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.spinButton:hover:not(:disabled) {
+    background-color: #0f766e;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.spinButton:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.spinButton:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Result display */
+.result {
+    font-size: 1.5rem;
+    color: #0d9488;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+/* Confetti animation styles */
+.confettiParticle {
+    position: absolute;
+    width: 10px;
+    height: 15px;
+    border-radius: 3px;
+    opacity: 0;
+    animation-name: confettiFall;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+@keyframes confettiFall {
+    0% {
+        opacity: 1;
+        transform: translateY(-50px) rotateZ(0deg) rotateX(0deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(100vh) rotateZ(720deg) rotateX(360deg);
+    }
+}
+
+/* Fall animation for celebration effects */
+@keyframes fall {
+    0% {
+        opacity: 1;
+        transform: translateY(-20px) rotateZ(0deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(100vh) rotateZ(720deg);
+    }
+}
+
+.animate-fall {
+    animation-name: fall;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+/* Menu Burger (Responsive) */
+#menu-toggle {
+    display: none;
+}
+
+.menu-icon {
+    display: none;
+    font-size: 2em;
+    cursor: pointer;
+}
+
+

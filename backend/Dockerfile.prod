@@ -1,0 +1,27 @@
+# Étape 1 : build & test
+FROM node:22-slim AS builder
+
+WORKDIR /app
+
+COPY package.json .  
+COPY package-lock.json .
+
+RUN npm ci
+
+COPY . .
+
+RUN npm run test
+
+# Étape 2 : image finale
+FROM node:22-slim
+
+WORKDIR /app
+
+COPY package.json .
+COPY package-lock.json .
+
+RUN npm ci --omit=dev
+
+COPY . .
+
+CMD ["node", "server.js"]

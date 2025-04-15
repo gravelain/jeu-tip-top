@@ -1,0 +1,163 @@
+pipeline {
+    agent any
+
+    environment {
+        NODE_VERSION     = '20'
+        DOCKER_REGISTRY  = 'docker.io'
+        IMAGE_NAME       = 'tiptopgame'
+        APP_NAME         = 'tip-top-game'
+        DOMAIN           = 'dsp5-archi-f24a-15m-g3.fr'
+        DOCKER_NETWORK   = 'tiptopgame_net'
+        TIMEZONE         = 'Europe/Paris'
+        TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
+    }
+
+    stages {
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Set Environment File') {
+            steps {
+                script {
+                    def envMap = [
+                        'develop' : '.env.dev',
+                        'preprod' : '.env.preprod',
+                        'prod'    : '.env.prod'
+                    ]
+                    env.ENV_FILE = envMap.get(env.BRANCH_NAME, '.env.default')
+                    echo "Using env file: ${env.ENV_FILE}"
+                }
+            }
+        }
+
+        stage('Install Backend (Express.js)') {
+            steps {
+                script {
+                    docker.image("node:${env.NODE_VERSION}").inside {
+                        sh 'cd backend && npm install'
+                    }
+                }
+            }
+        }
+
+        stage('Install Frontend (React.js)') {
+            steps {
+                script {
+                    docker.image("node:${env.NODE_VERSION}").inside {
+                        sh 'cd frontend && npm install'
+                    }
+                }
+            }
+        }
+
+        stage('Backend Unit Tests') {
+            steps {
+                script {
+                    sh '''
+                        echo "[INFO] Starting MongoDB container for backend tests..."
+                        docker run -d --rm \
+                            --network ${DOCKER_NETWORK} \
+                            --name test-mongo \
+                            -e MONGO_INITDB_ROOT_USERNAME=root \
+                            -e MONGO_INITDB_ROOT_PASSWORD=example \
+                            mongo
+
+                        echo "[INFO] Checking backend folder contents..."
+                        ls -al $(pwd)/backend
+
+                        echo "[INFO] Running backend tests in a Docker container..."
+                        docker run --rm \
+                            --network ${DOCKER_NETWORK} \
+                            -v $(pwd)/backend:/app \
+                            -w /app \
+                            node:${NODE_VERSION} \
+                            sh -c "ls -la && cat package.json && npm install && npm run test"
+                    '''
+                }
+            }
+        }
+
+        stage('Frontend Unit Tests') {
+            steps {
+                script {
+                    sh '''
+                        echo "[INFO] Running frontend tests in a Docker container..."
+                        docker run --rm \
+                            -v $(pwd)/frontend:/app \
+                            -w /app \
+                            node:${NODE_VERSION} \
+                            sh -c "npm install && npm run test"
+                    '''
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_SCANNER_OPTS = "-Dsonar.projectKey=$APP_NAME -Dsonar.sources=. -Dsonar.language=js -Dsonar.sourceEncoding=UTF-8 -Dsonar.exclusions=**/test/** -Dsonar.tests=**/test"
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'sonar-scanner'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    def timestamp = new Date().format("yyyyMMddHHmmss")
+                    def tag = "${env.BRANCH_NAME}-${timestamp}"
+                    env.DOCKER_TAG = tag
+                    sh "docker build --env-file ${env.ENV_FILE} -t $DOCKER_REGISTRY/$DOCKER_USER/$IMAGE_NAME:$DOCKER_TAG ."
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/$IMAGE_NAME:$DOCKER_TAG"
+            }
+        }
+
+        stage('Deploy Docker Container') {
+            steps {
+                script {
+                    def containerName = "${IMAGE_NAME}-${env.BRANCH_NAME}-${UUID.randomUUID().toString()}"
+                    env.CONTAINER_NAME = containerName
+                    sh "docker run -d --env-file ${env.ENV_FILE} --name $CONTAINER_NAME $DOCKER_REGISTRY/$DOCKER_USER/$IMAGE_NAME:$DOCKER_TAG"
+                }
+            }
+        }
+
+        stage('Backup MongoDB') {
+            steps {
+                sh "docker exec $CONTAINER_NAME mongodump --archive=/backup/${IMAGE_NAME}-${env.BRANCH_NAME}.gz --gzip"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up..."
+            sh 'docker logout || true'
+            sh 'docker system prune -f || true'
+            junit allowEmptyResults: true, testResults: '**/*-test-results.xml'
+        }
+        success {
+            echo "Pipeline completed successfully."
+        }
+        failure {
+            echo "Pipeline failed."
+        }
+    }
+}
+
+

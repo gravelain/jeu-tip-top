@@ -1,0 +1,72 @@
+services:
+  backend:
+    platform: linux/amd64
+    build:
+      context: ./backend
+    container_name: tip_top_backend_dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules 
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./backend/.env.dev
+    environment:
+      - NODE_ENV=development
+    command: nodemon server.js
+    depends_on:
+      - mongodb
+    networks:
+      - web
+
+  frontend:
+    platform: linux/amd64
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: tip_top_frontend_dev
+    ports:
+      - "4200:4200"
+    environment:
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=http://localhost:4000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - web
+
+  mongodb:
+    image: mongo:6.0
+    container_name: tip_top_mongo_dev
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - web
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express-dev
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    ports:
+      - "8084:8081"
+    networks:
+      - web
+
+networks:
+  web:
+
+volumes:
+  mongo_data:

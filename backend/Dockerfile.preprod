@@ -1,0 +1,34 @@
+# Étape 1 : Build avec dépendances complètes
+FROM --platform=linux/amd64 node:18-slim AS builder
+
+WORKDIR /app
+
+# Copier les fichiers de dépendances
+COPY package*.json ./
+
+# Installer toutes les dépendances (prod + dev)
+RUN npm install
+
+# Copier le reste du code
+COPY . .
+
+# Étape 2 : Image exécutable
+FROM --platform=linux/amd64 node:18-slim
+
+WORKDIR /app
+
+# Copier tout depuis le builder (y compris les devDeps)
+COPY --from=builder /app /app
+
+# Ajouter un utilisateur non-root
+RUN useradd --user-group --create-home --shell /bin/false appuser
+USER appuser
+
+# Définir l’environnement comme préprod
+ENV NODE_ENV=staging
+
+# Exposer le port
+EXPOSE 4000
+
+# Commande de lancement
+CMD ["node", "server.js"]

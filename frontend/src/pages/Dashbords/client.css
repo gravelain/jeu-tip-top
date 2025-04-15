@@ -1,0 +1,226 @@
+/* Global styles */
+body {
+  font-family: 'Arial', sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Default Layout - Dashboard */
+.dashboard {
+  display: flex;
+  flex-direction: row; /* Par défaut, on place la colonne verte et le contenu principal côte à côte */
+}
+
+.left-column {
+  width: 250px; /* Largeur de la colonne verte */
+  background-color: green; /* Couleur de la colonne verte */
+  padding: 20px;
+  height: 100vh; /* Assurez-vous que la colonne occupe toute la hauteur */
+}
+
+.main-content {
+  flex-grow: 1; /* Le contenu principal occupe tout l'espace restant */
+  padding: 20px;
+}
+
+/* Responsive Design for Phone */
+@media (max-width: 767px) {
+  /* En mode mobile, on empile les éléments verticalement */
+  .dashboard {
+      flex-direction: column; /* Empile la colonne et le contenu */
+  }
+
+  /* Masquer la colonne verte à gauche */
+  .left-column {
+      display: none; /* Cache la colonne sur les petits écrans */
+  }
+
+  /* Ajuster le contenu principal */
+  .main-content {
+      width: 100%; /* Le contenu principal occupe toute la largeur */
+      padding: 10px; /* Réduit légèrement les paddings pour les petits écrans */
+  }
+
+  /* Styling for the User Info card */
+  .user-info, .gains-info {
+      width: 100%;
+      margin-bottom: 20px;
+  }
+
+  /* Remove grid system, make content full-width */
+  .grid-cols-1, .grid-cols-2, .grid-cols-3 {
+      display: block;
+      width: 100%;
+  }
+
+  .section-header {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+  }
+
+  /* Modifier button adjustments */
+  .edit-button {
+      width: 100%;
+      text-align: center;
+      margin-top: 15px;
+  }
+
+  /* Form fields adjustments */
+  input[type="text"], input[type="email"], input[type="tel"] {
+      width: 100%;
+      padding: 12px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+  }
+
+  /* Alert messages (Success/Error) */
+  .alert {
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+  }
+
+  .alert-success {
+      background-color: #d4edda;
+      border-color: #c3e6cb;
+      color: #155724;
+  }
+
+  .alert-error {
+      background-color: #f8d7da;
+      border-color: #f5c6cb;
+      color: #721c24;
+  }
+
+  .alert-info {
+      background-color: #cce5ff;
+      border-color: #b8daff;
+      color: #004085;
+  }
+
+  /* Gains section adjustments */
+  .gains-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .gains-item:last-child {
+      margin-bottom: 0;
+  }
+
+  /* Align icons vertically with the content */
+  .icon {
+      margin-right: 10px;
+      vertical-align: middle;
+  }
+
+  .gains-section h3 {
+      font-size: 1.25rem;
+      margin-bottom: 15px;
+  }
+
+  /* Ensure everything is readable */
+  .text-sm {
+      font-size: 0.875rem;
+  }
+
+  /* Buttons */
+  button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 1rem;
+  }
+
+  /* Specific adjustments for the button container */
+  .button-group {
+      display: flex;
+      flex-direction: column;
+  }
+
+  .button-group button {
+      margin-top: 10px;
+  }
+
+  /* Make form inputs responsive */
+  .input-field {
+      margin-bottom: 15px;
+  }
+}
+
+/* Larger screen sizes (Tablets and up) */
+@media (min-width: 768px) {
+  /* For screens larger than 768px, use the default grid layout */
+  .dashboard {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+  }
+
+  /* Header font size */
+  .section-header {
+      font-size: 2rem;
+      margin-bottom: 15px;
+  }
+
+  /* Button behavior for larger screens */
+  .edit-button {
+      display: inline-block;
+      width: auto;
+      margin-top: 0;
+  }
+
+  /* Alerts spacing for larger screens */
+  .alert {
+      margin-bottom: 25px;
+  }
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mt-6 {
+  margin-top: 1.5rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.bg-green-100 {
+  background-color: #d1fbd1;
+}
+
+.bg-red-100 {
+  background-color: #fdd;
+}

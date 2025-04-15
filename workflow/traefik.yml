@@ -1,0 +1,33 @@
+# Configuration Traefik
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+    forwardedHeaders:
+      trustedIPs:
+        - "127.0.0.1"          # Boucle locale Localhost
+        - "161.97.76.223"      # IP publique de mon VPS
+        # Ajout d'autres IP si nécessaires (par exemple, des proxys ou CDN).
+
+providers:
+  docker:
+    exposedByDefault: false
+
+api:
+  dashboard: true
+
+http:
+  middlewares:
+    websocket:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          Access-Control-Allow-Origin: "*"
+          Access-Control-Allow-Methods: "GET, POST, OPTIONS"
+          Access-Control-Allow-Headers: "*"
+
+# Traefik écoute sur le port 80.
+# Se base sur Docker pour récupérer les conteneurs.
+# Permet d’accéder au dashboard de Traefik.
