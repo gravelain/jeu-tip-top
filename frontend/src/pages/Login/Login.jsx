@@ -66,7 +66,7 @@ const Login = () => {
               to="/register"
               className="font-medium text-teal-600 hover:text-teal-500"
             >
-              créez un compte
+              créer un compte
             </Link>
           </p>
         </div>
