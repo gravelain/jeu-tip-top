@@ -104,9 +104,6 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            tools {
-                sonarQubeScanner 'SonarScanner'
-            }
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
