@@ -83,7 +83,16 @@ pipeline {
                     docker.image('node:20-bullseye').inside {
                         dir('backend') {
                             echo "📦 Installing backend deps"
-                            sh 'apt-get update && apt-get install -y libcurl4' 
+                            sh '''
+                                apt-get update && apt-get install -y \
+                                    libcurl4 \
+                                    libssl1.1 \
+                                    libcrypto1.1 \
+                                    ca-certificates \
+                                    curl \
+                                    git \
+                                    mongodb-tools
+                            '''
                             sh 'npm ci'
                             echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
                             sh "NODE_ENV=test npm run test"
