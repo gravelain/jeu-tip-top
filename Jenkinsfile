@@ -45,12 +45,9 @@ pipeline {
         stage('Ensure Docker Network') {
             steps {
                 sh '''
-                    if ! docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1; then
-                        echo "[INFO] 🛠 Creating missing Docker network '${DOCKER_NETWORK}'..."
+                    docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1 || \
                         docker network create ${DOCKER_NETWORK}
-                    else
-                        echo "[INFO] ✅ Docker network '${DOCKER_NETWORK}' already exists."
-                    fi
+                    echo "[INFO] ✅ Docker network '${DOCKER_NETWORK}' is ready."
                 '''
             }
         }
