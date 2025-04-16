@@ -54,8 +54,17 @@ pipeline {
         stage('Start MongoDB Service for Tests') {
             steps {
                 script {
-                    // Lancer MongoDB dans un container Docker pour les tests
                     echo "[INFO] Starting MongoDB container for testing..."
+
+                    // Supprimer le conteneur mongodb-test s'il existe déjà
+                    sh '''
+                        if docker ps -a --filter "name=mongodb-test" --format "{{.Names}}" | grep -q "mongodb-test"; then
+                            echo "[INFO] Removing existing mongodb-test container..."
+                            docker rm -f mongodb-test || true
+                        fi
+                    '''
+                    
+                    // Créer et démarrer le nouveau conteneur mongodb-test
                     sh '''
                         docker run -d --name mongodb-test \
                             --network ${DOCKER_NETWORK} \
