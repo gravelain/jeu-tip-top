@@ -10,7 +10,7 @@ pipeline {
         DOCKER_NETWORK   = 'tiptopgame_net'
         TIMEZONE         = 'Europe/Paris'
         TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
-        SONARQUBE_TOKEN  = '' // Variable pour SonarQube
+        SONARQUBE_TOKEN  = ''
     }
 
     stages {
@@ -58,7 +58,6 @@ pipeline {
 
                     def containerName = "mongodb-test-${BUILD_ID}"
 
-                    // On passe le nom au shell via l'environnement
                     withEnv(["MONGO_CONTAINER_NAME=${containerName}"]) {
                         sh '''
                             echo "[DEBUG] Container name: $MONGO_CONTAINER_NAME"
@@ -89,23 +88,24 @@ pipeline {
         stage('Backend Unit Tests') {
             steps {
                 script {
-                    docker.image('node:20-bullseye').inside {
-                        dir('backend') {
-                            echo "📦 Installing backend deps"
-                            sh '''
-                                apt-get update && apt-get install -y \
-                                    libcurl4 \
-                                    libssl3 \
-                                    ca-certificates \
-                                    curl \
-                                    git \
-                                    mongodb-clients
-                            '''
-                            sh 'npm ci'
-                            echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
-                            sh "NODE_ENV=test npm run test"
-                        }
-                    }
+                    sh '''
+                        echo "[INFO] 📦 Installing backend dependencies..."
+                        apt-get update
+                        apt-get install -y libssl1.1 curl git ca-certificates gnupg
+
+                        echo "[INFO] 🧩 Adding MongoDB shell repository..."
+                        curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-6.0.gpg
+                        echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" > /etc/apt/sources.list.d/mongodb-org-6.0.list
+
+                        apt-get update
+                        apt-get install -y mongodb-org-shell
+
+                        echo "[INFO] ✅ Dependencies installed."
+
+                        echo "[INFO] 🧪 Running backend unit tests..."
+                        npm install
+                        npm run test
+                    '''
                 }
             }
         }
@@ -160,7 +160,7 @@ pipeline {
                             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
                             docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
                         '''
-                        
+
                         echo "[BUILD] 🐳 Building and pushing frontend image..."
                         sh '''
                             docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend
