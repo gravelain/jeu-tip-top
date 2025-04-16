@@ -10,7 +10,7 @@ pipeline {
         DOCKER_NETWORK   = 'tiptopgame_net'
         TIMEZONE         = 'Europe/Paris'
         TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
-        SONARQUBE_TOKEN  = '' // Variable pour SonarQube
+        SONARQUBE_TOKEN  = ''
     }
 
     stages {
@@ -56,7 +56,6 @@ pipeline {
                 script {
                     echo "[INFO] Starting MongoDB container for testing..."
 
-                    // Supprimer le conteneur mongodb-test s'il existe déjà
                     sh '''
                         if docker ps -a --filter "name=mongodb-test" --format "{{.Names}}" | grep -q "mongodb-test"; then
                             echo "[INFO] Removing existing mongodb-test container..."
@@ -64,7 +63,6 @@ pipeline {
                         fi
                     '''
                     
-                    // Créer et démarrer le nouveau conteneur mongodb-test
                     sh '''
                         docker run -d --name mongodb-test \
                             --network ${DOCKER_NETWORK} \
@@ -170,26 +168,13 @@ pipeline {
                             --env-file ${env.ENV_FILE} \
                             --network ${DOCKER_NETWORK} \
                             --name ${backendName} \
-                            $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
+                            $DOCKER_REGISTRY/${DOCKER_USER}/${IMAGE_NAME}-backend:$DOCKER_TAG
 
                         echo "[DEPLOY] 🚀 Running frontend container..."
                         docker run -d \
                             --network ${DOCKER_NETWORK} \
                             --name ${frontendName} \
-                            $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG
-                    """
-                }
-            }
-        }
-
-        stage('Backup MongoDB') {
-            steps {
-                script {
-                    def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
-                    sh """
-                        echo "[INFO] 📦 Creating MongoDB backup..."
-                        docker exec ${backendName} \
-                            mongodump --archive=/backup/${IMAGE_NAME}-${BRANCH_NAME}.gz --gzip || echo '[WARN] Backup failed (maybe mongod not running?)'
+                            $DOCKER_REGISTRY/${DOCKER_USER}/${IMAGE_NAME}-frontend:$DOCKER_TAG
                     """
                 }
             }
