@@ -86,12 +86,11 @@ pipeline {
                             sh '''
                                 apt-get update && apt-get install -y \
                                     libcurl4 \
-                                    libssl1.1 \
-                                    libcrypto1.1 \
+                                    libssl3 \
                                     ca-certificates \
                                     curl \
                                     git \
-                                    mongodb-tools
+                                    mongodb-clients
                             '''
                             sh 'npm ci'
                             echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
