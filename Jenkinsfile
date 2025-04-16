@@ -56,33 +56,32 @@ pipeline {
                 script {
                     echo "[INFO] Starting MongoDB container for testing..."
 
-                    // Générer un nom unique pour le conteneur MongoDB en fonction de BUILD_ID
                     def containerName = "mongodb-test-${BUILD_ID}"
 
-                    // Supprimer le conteneur mongodb-test s'il existe déjà
-                    sh '''
-                        EXISTING_CONTAINER=$(docker ps -a --filter "name=${containerName}" --format "{{.Names}}")
-                        if [ -n "$EXISTING_CONTAINER" ]; then
-                            echo "[INFO] Removing existing mongodb-test container..."
-                            docker rm -f $EXISTING_CONTAINER || true
-                        fi
+                    // On passe le nom au shell via l'environnement
+                    withEnv(["MONGO_CONTAINER_NAME=${containerName}"]) {
+                        sh '''
+                            echo "[DEBUG] Container name: $MONGO_CONTAINER_NAME"
 
-                        // Assurez-vous que le conteneur est bien supprimé avant de le recréer
-                        while docker ps -a --filter "name=${containerName}" --format "{{.Names}}" | grep -q "${containerName}"; do
-                            echo "[INFO] Waiting for ${containerName} container to be removed..."
-                            sleep 2
-                        done
-                    '''
+                            EXISTING_CONTAINER=$(docker ps -a --filter "name=$MONGO_CONTAINER_NAME" --format "{{.Names}}")
+                            if [ -n "$EXISTING_CONTAINER" ]; then
+                                echo "[INFO] Removing existing mongodb-test container..."
+                                docker rm -f $EXISTING_CONTAINER || true
+                            fi
 
-                    // Créer et démarrer le nouveau conteneur MongoDB avec un nom unique
-                    sh '''
-                        docker run -d --name ${containerName} \
-                            --network ${DOCKER_NETWORK} \
-                            -e MONGO_INITDB_ROOT_USERNAME=root \
-                            -e MONGO_INITDB_ROOT_PASSWORD=password \
-                            -e MONGO_INITDB_DATABASE=test_db \
-                            mongo:6.0
-                    '''
+                            while docker ps -a --filter "name=$MONGO_CONTAINER_NAME" --format "{{.Names}}" | grep -q "$MONGO_CONTAINER_NAME"; do
+                                echo "[INFO] Waiting for $MONGO_CONTAINER_NAME container to be removed..."
+                                sleep 2
+                            done
+
+                            docker run -d --name $MONGO_CONTAINER_NAME \
+                                --network ${DOCKER_NETWORK} \
+                                -e MONGO_INITDB_ROOT_USERNAME=root \
+                                -e MONGO_INITDB_ROOT_PASSWORD=password \
+                                -e MONGO_INITDB_DATABASE=test_db \
+                                mongo:6.0
+                        '''
+                    }
                 }
             }
         }
