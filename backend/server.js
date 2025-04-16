@@ -1,7 +1,7 @@
 require("dotenv").config();  // Charge les variables d'environnement
 const mongoose = require("mongoose");
 const app = require("./app");
-const connectDB = require("./src/config/db");
+const { connectDB } = require("./src/config/db");
 
 const PORT = process.env.PORT || 4000;
 
