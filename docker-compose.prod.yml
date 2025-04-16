@@ -69,7 +69,7 @@ services:
       - "traefik.http.routers.frontend.rule=Host(`dsp5-archi-f24a-15m-g3.fr`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=myresolver"
-      - "traefik.http.services.frontend.loadbalancer.server.port=8081"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8085"
     networks:
       - web
 
@@ -98,7 +98,7 @@ services:
       ME_CONFIG_MONGODB_SERVER: mongodb
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.mongoexpress.rule=Host(`no-set`)"
+      - "traefik.http.routers.mongoexpress.rule=Host(`mongo.wk-archi-f24a-15m-g3.fr`)"
       - "traefik.http.routers.mongoexpress.entrypoints=websecure"
       - "traefik.http.routers.mongoexpress.tls.certresolver=myresolver"
       - "traefik.http.services.mongoexpress.loadbalancer.server.port=8081"
