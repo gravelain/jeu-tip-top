@@ -38,19 +38,6 @@ pipeline {
             }
         }
 
-        stage('Docker Login (Automatic via Jenkins Credentials)') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    script {
-                        // Docker se connecte automatiquement via Jenkins credentials
-                        echo "[DEBUG] Docker credentials injected: User: ${env.DOCKER_USER}"
-
-                        // Pas besoin de faire docker login, Jenkins s'en charge via le credentials
-                    }
-                }
-            }
-        }
-
         stage('Ensure Docker Network') {
             steps {
                 sh '''
@@ -64,16 +51,19 @@ pipeline {
             }
         }
 
-        stage('Set Environment File') {
+        stage('Start MongoDB Service for Tests') {
             steps {
                 script {
-                    def envMap = [
-                        'develop' : '.env.dev',
-                        'preprod' : '.env.preprod',
-                        'prod'    : '.env.prod'
-                    ]
-                    env.ENV_FILE = envMap.get(env.BRANCH_NAME, '.env.dev')
-                    echo "🔧 Using env file: ${env.ENV_FILE}"
+                    // Lancer MongoDB dans un container Docker pour les tests
+                    echo "[INFO] Starting MongoDB container for testing..."
+                    sh '''
+                        docker run -d --name mongodb-test \
+                            --network ${DOCKER_NETWORK} \
+                            -e MONGO_INITDB_ROOT_USERNAME=root \
+                            -e MONGO_INITDB_ROOT_PASSWORD=password \
+                            -e MONGO_INITDB_DATABASE=test_db \
+                            mongo:6.0
+                    '''
                 }
             }
         }
@@ -84,7 +74,7 @@ pipeline {
                     docker.image('node:20-bullseye').inside {
                         dir('backend') {
                             echo "📦 Installing backend deps"
-                            sh 'apt-get update && apt-get install -y libcurl4' // ✅ Ajout lib manquante
+                            sh 'apt-get update && apt-get install -y libcurl4' 
                             sh 'npm ci'
                             echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
                             sh "NODE_ENV=test npm run test"
@@ -155,7 +145,6 @@ pipeline {
             }
         }
 
-
         stage('Deploy Docker Containers') {
             steps {
                 script {
@@ -207,6 +196,7 @@ pipeline {
                 sh """
                     docker rm -f ${backendName} || true
                     docker rm -f ${frontendName} || true
+                    docker rm -f mongodb-test || true
                     docker logout || true
                     docker system prune -f || true
                 """
