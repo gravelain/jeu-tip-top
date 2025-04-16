@@ -107,7 +107,8 @@ pipeline {
                         DEBIAN_FRONTEND=noninteractive apt-get install -y libssl3 curl git ca-certificates gnupg
 
                         echo "[INFO] 🧪 Ajout du dépôt MongoDB..."
-                        curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --batch --dearmor -o /tmp/mongodb-server-6.0.gpg
+                        rm -f /tmp/mongodb-server-6.0.gpg
+                        curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --dearmor --output /tmp/mongodb-server-6.0.gpg
                         echo "deb [signed-by=/tmp/mongodb-server-6.0.gpg] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" > /etc/apt/sources.list.d/mongodb-org-6.0.list
                         apt-get update -y
                         DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org-shell
@@ -117,7 +118,7 @@ pipeline {
 
                     echo "[INFO] Installing Node.js and npm..."
                     sh '''
-                        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 
                         DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
                         node -v
                         npm -v
