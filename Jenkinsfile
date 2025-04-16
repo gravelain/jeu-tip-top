@@ -135,10 +135,14 @@ pipeline {
                         def tag = "${env.BRANCH_NAME}-${timestamp}"
                         env.DOCKER_TAG = tag
 
+                        echo "[LOGIN] 🔐 Docker login before build"
+                        sh """
+                            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+                        """
+
                         echo "[BUILD] 🐳 Building and pushing backend image..."
                         sh """
                             docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend
-                            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
                             docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
                         """
                         
