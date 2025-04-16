@@ -100,26 +100,8 @@ pipeline {
                             sleep 5
                         done
 
-                        for i in {1..5}; do
-                            # Nettoyage des verrous APT existants
-                            rm -f /var/lib/apt/lists/lock
-                            rm -f /var/lib/dpkg/lock-frontend
-                            rm -f /var/cache/apt/archives/lock
-
-                            apt-get update -y && break || echo "[INFO] Retry $i: apt-get update failed, retrying..."
-                            sleep 5
-                        done
-
-                        DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-                        dpkg -l | grep -qw apt-utils || DEBIAN_FRONTEND=noninteractive apt-get install -y apt-utils
-                        DEBIAN_FRONTEND=noninteractive apt-get install -y libssl3 curl git ca-certificates gnupg
-
-                        echo "[INFO] 🧪 Ajout du dépôt MongoDB..."
-                        rm -f /tmp/mongodb-server-6.0.gpg
-                        curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --dearmor --output /tmp/mongodb-server-6.0.gpg
-                        echo "deb [signed-by=/tmp/mongodb-server-6.0.gpg] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" > /etc/apt/sources.list.d/mongodb-org-6.0.list
                         apt-get update -y
-                        DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org-shell
+                        DEBIAN_FRONTEND=noninteractive apt-get install -y libssl3 curl git ca-certificates gnupg mongodb-org-shell
 
                         echo "[INFO] ✅ Dependencies installed."
                     '''
