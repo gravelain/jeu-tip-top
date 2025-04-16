@@ -58,10 +58,16 @@ pipeline {
 
                     // Supprimer le conteneur mongodb-test s'il existe déjà
                     sh '''
-                        if docker ps -a --filter "name=mongodb-test" --format "{{.Names}}" | grep -q "mongodb-test"; then
+                        EXISTING_CONTAINER=$(docker ps -a --filter "name=mongodb-test" --format "{{.Names}}")
+                        if [ -n "$EXISTING_CONTAINER" ]; then
                             echo "[INFO] Removing existing mongodb-test container..."
                             docker rm -f mongodb-test || true
                         fi
+                        # Assurez-vous que le conteneur est supprimé avant de le recréer
+                        while docker ps -a --filter "name=mongodb-test" --format "{{.Names}}" | grep -q "mongodb-test"; do
+                            echo "[INFO] Waiting for mongodb-test container to be removed..."
+                            sleep 2
+                        done
                     '''
                     
                     // Créer et démarrer le nouveau conteneur mongodb-test
