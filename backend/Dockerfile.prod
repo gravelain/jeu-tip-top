@@ -6,8 +6,8 @@ WORKDIR /app
 COPY package.json .  
 COPY package-lock.json . 
 
-# Installer la bibliothèque manquante
-RUN apt-get update && apt-get install -y libssl3 libcurl4
+# Mettre à jour les dépôts et installer les dépendances nécessaires
+RUN apt-get update && apt-get install -y libssl3 libcurl4 apt-utils curl git ca-certificates gnupg
 
 RUN npm ci
 
@@ -23,6 +23,7 @@ WORKDIR /app
 COPY package.json . 
 COPY package-lock.json . 
 
+# Installer les dépendances, sans les devDependencies pour l'image finale
 RUN npm ci --omit=dev
 
 COPY . .
