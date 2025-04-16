@@ -88,21 +88,33 @@ pipeline {
         stage('Backend Unit Tests') {
             steps {
                 script {
+                    echo "[INFO] 📦 Installing backend dependencies..."
+
+                    // Mise à jour des dépôts et installation des dépendances système
                     sh '''
-                        echo "[INFO] 📦 Installing backend dependencies..."
-                        apt-get update
-                        apt-get install -y libssl3 curl git ca-certificates gnupg
+                        apt-get update -y
+                        apt-get install -y libssl3 curl git ca-certificates gnupg apt-utils
 
                         echo "[INFO] 🧩 Adding MongoDB shell repository..."
                         curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-6.0.gpg
                         echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" > /etc/apt/sources.list.d/mongodb-org-6.0.list
-
-                        apt-get update
+                        apt-get update -y
                         apt-get install -y mongodb-org-shell
 
                         echo "[INFO] ✅ Dependencies installed."
+                    '''
 
-                        echo "[INFO] 🧪 Running backend unit tests..."
+                    // Installation de Node.js et npm
+                    echo "[INFO] Installing Node.js and npm..."
+                    sh '''
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+                        apt-get install -y nodejs
+                        node -v
+                        npm -v
+                    '''
+
+                    echo "[INFO] 🧪 Running backend unit tests..."
+                    sh '''
                         npm install
                         npm run test
                     '''
