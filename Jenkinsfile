@@ -37,30 +37,10 @@ pipeline {
             }
         }
 
-        stage('Docker Login & Build') {
+        stage('Docker Login') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )]) {
-                    script {
-                        sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin'
-
-                        def timestamp = new Date().format("yyyyMMddHHmmss")
-                        def tag = "${env.BRANCH_NAME}-${timestamp}"
-                        env.DOCKER_TAG = tag
-
-                        echo "[BUILD] 🐳 Building backend..."
-                        sh "docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend"
-
-                        echo "[BUILD] 🐳 Building frontend..."
-                        sh "docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend"
-
-                        echo "[PUSH] 📦 Pushing Docker images..."
-                        sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG"
-                        sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG"
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                 }
             }
         }
@@ -126,18 +106,44 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                        sh """
-                            docker run --rm \
-                                -e SONAR_HOST_URL=\$SONAR_HOST_URL \
-                                -e SONAR_AUTH_TOKEN=\$SONAR_AUTH_TOKEN \
-                                -v \$(pwd):/usr/src \
-                                sonarsource/sonar-scanner-cli:latest \
-                                -Dsonar.projectKey=tip-top-game \
-                                -Dsonar.sources=. \
-                                -Dsonar.login=\$SONAR_AUTH_TOKEN
-                        """
+                        script {
+                            // Utilisation de docker avec image de SonarScanner
+                            sh """
+                                docker run --rm \
+                                    -e SONAR_HOST_URL=\$SONAR_HOST_URL \
+                                    -e SONAR_AUTH_TOKEN=\$SONAR_AUTH_TOKEN \
+                                    -v \$(pwd):/usr/src \
+                                    sonarsource/sonar-scanner-cli:latest \
+                                    -Dsonar.projectKey=tip-top-game \
+                                    -Dsonar.sources=. \
+                                    -Dsonar.login=\$SONAR_AUTH_TOKEN
+                            """
+                        }
                     }
                 }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                script {
+                    def timestamp = new Date().format("yyyyMMddHHmmss")
+                    def tag = "${env.BRANCH_NAME}-${timestamp}"
+                    env.DOCKER_TAG = tag
+
+                    echo "[BUILD] 🐳 Building backend..."
+                    sh "docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend"
+
+                    echo "[BUILD] 🐳 Building frontend..."
+                    sh "docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend"
+                }
+            }
+        }
+
+        stage('Push Docker Images') {
+            steps {
+                sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG"
+                sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG"
             }
         }
 
