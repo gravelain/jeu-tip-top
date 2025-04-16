@@ -40,7 +40,10 @@ pipeline {
         stage('Docker Login') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                    script {
+                        env.DOCKER_USER = DOCKER_USER // 👈 Correction ici
+                        sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                    }
                 }
             }
         }
@@ -107,7 +110,6 @@ pipeline {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         script {
-                            // Utilisation de docker avec image de SonarScanner
                             sh """
                                 docker run --rm \
                                     -e SONAR_HOST_URL=\$SONAR_HOST_URL \
