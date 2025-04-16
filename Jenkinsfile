@@ -10,7 +10,6 @@ pipeline {
         DOCKER_NETWORK   = 'tiptopgame_net'
         TIMEZONE         = 'Europe/Paris'
         TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
-        
     }
 
     stages {
@@ -107,20 +106,23 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                        docker.image('sonarsource/sonar-scanner-cli:latest').inside {
-                            sh '''
-                                sonar-scanner \
-                                -Dsonar.projectKey=tip-top-game \
-                                -Dsonar.sources=. \
-                                -Dsonar.host.url=$SONAR_HOST_URL \
-                                -Dsonar.login=$SONAR_AUTH_TOKEN
-                            '''
+                        script {
+                            // Utilisation de docker avec image de SonarScanner
+                            sh """
+                                docker run --rm \
+                                    -e SONAR_HOST_URL=\$SONAR_HOST_URL \
+                                    -e SONAR_AUTH_TOKEN=\$SONAR_AUTH_TOKEN \
+                                    -v \$(pwd):/usr/src \
+                                    sonarsource/sonar-scanner-cli:latest \
+                                    -Dsonar.projectKey=tip-top-game \
+                                    -Dsonar.sources=. \
+                                    -Dsonar.login=\$SONAR_AUTH_TOKEN
+                            """
                         }
                     }
                 }
             }
         }
-
 
         stage('Build Docker Images') {
             steps {
