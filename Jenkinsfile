@@ -10,7 +10,9 @@ pipeline {
         DOCKER_NETWORK   = 'tiptopgame_net'
         TIMEZONE         = 'Europe/Paris'
         TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
-        DOCKER_USER      = ''  // Variable DOCKER_USER définie globalement
+        DOCKER_USER      = '' // Variable DOCKER_USER initialisée globalement
+        DOCKER_PASS      = '' // Variable DOCKER_PASS initialisée globalement
+        SONARQUBE_TOKEN  = '' // Variable pour SonarQube
     }
 
     stages {
@@ -40,10 +42,15 @@ pipeline {
 
         stage('Docker Login') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER_CRED', passwordVariable: 'DOCKER_PASS_CRED')]) {
                     script {
-                        // Maintenant la variable DOCKER_USER est définie globalement et accessible
-                        env.DOCKER_USER = DOCKER_USER  // Affectation globale
+                        // Affecte les variables globales de manière explicite
+                        env.DOCKER_USER = DOCKER_USER_CRED
+                        env.DOCKER_PASS = DOCKER_PASS_CRED
+
+                        echo "[DEBUG] DOCKER_USER: ${env.DOCKER_USER}"  // Debug pour vérifier la variable
+                        echo "[DEBUG] DOCKER_PASS: ${env.DOCKER_PASS}"
+
                         sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                     }
                 }
@@ -77,6 +84,58 @@ pipeline {
             }
         }
 
+        stage('Backend Unit Tests') {
+            steps {
+                script {
+                    docker.image('node:20-bullseye').inside {
+                        dir('backend') {
+                            echo "📦 Installing backend deps"
+                            sh 'apt-get update && apt-get install -y libcurl4' // ✅ Ajout lib manquante
+                            sh 'npm ci'
+                            echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
+                            sh "NODE_ENV=test npm run test"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Frontend Unit Tests') {
+            steps {
+                script {
+                    docker.image('node:20').inside {
+                        dir('frontend') {
+                            echo "📦 Installing frontend deps"
+                            sh 'npm ci'
+                            echo "🧪 Running frontend tests"
+                            sh 'CI=true npm test -- --watchAll=false'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                        script {
+                            sh """
+                                docker run --rm \
+                                    -e SONAR_HOST_URL=\$SONAR_HOST_URL \
+                                    -e SONAR_AUTH_TOKEN=\$SONAR_AUTH_TOKEN \
+                                    -v \$(pwd):/usr/src \
+                                    sonarsource/sonar-scanner-cli:latest \
+                                    -Dsonar.projectKey=tip-top-game \
+                                    -Dsonar.sources=. \
+                                    -Dsonar.login=\$SONAR_AUTH_TOKEN
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Docker Images') {
             steps {
                 script {
@@ -85,8 +144,8 @@ pipeline {
                     env.DOCKER_TAG = tag
 
                     echo "[BUILD] 🐳 Building backend..."
-                    // Vérification du Docker User
-                    echo "[DEBUG] DOCKER_USER is: ${env.DOCKER_USER}"
+                    // Debug de la variable DOCKER_USER
+                    echo "[DEBUG] DOCKER_USER: ${env.DOCKER_USER}"
                     sh "docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend"
 
                     echo "[BUILD] 🐳 Building frontend..."
