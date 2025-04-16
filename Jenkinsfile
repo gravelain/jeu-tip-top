@@ -91,7 +91,7 @@ pipeline {
                     sh '''
                         echo "[INFO] 📦 Installing backend dependencies..."
                         apt-get update
-                        apt-get install -y libssl1.1 curl git ca-certificates gnupg
+                        apt-get install -y libssl3 curl git ca-certificates gnupg
 
                         echo "[INFO] 🧩 Adding MongoDB shell repository..."
                         curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-6.0.gpg
