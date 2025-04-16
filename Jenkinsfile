@@ -59,32 +59,18 @@ pipeline {
             steps {
                 script {
                     echo "[INFO] Starting MongoDB container for testing..."
-
                     def containerName = "mongodb-test-${BUILD_ID}"
 
-                    withEnv(["MONGO_CONTAINER_NAME=${containerName}"]) {
-                        sh '''
-                            echo "[DEBUG] Container name: $MONGO_CONTAINER_NAME"
-
-                            EXISTING_CONTAINER=$(docker ps -a --filter "name=$MONGO_CONTAINER_NAME" --format "{{.Names}}")
-                            if [ -n "$EXISTING_CONTAINER" ]; then
-                                echo "[INFO] Removing existing mongodb-test container..."
-                                docker rm -f $EXISTING_CONTAINER || true
-                            fi
-
-                            while docker ps -a --filter "name=$MONGO_CONTAINER_NAME" --format "{{.Names}}" | grep -q "$MONGO_CONTAINER_NAME"; do
-                                echo "[INFO] Waiting for $MONGO_CONTAINER_NAME container to be removed..."
-                                sleep 2
-                            done
-
-                            docker run -d --name $MONGO_CONTAINER_NAME \
-                                --network ${DOCKER_NETWORK} \
-                                -e MONGO_INITDB_ROOT_USERNAME=root \
-                                -e MONGO_INITDB_ROOT_PASSWORD=password \
-                                -e MONGO_INITDB_DATABASE=test_db \
-                                mongo:6.0
-                        '''
-                    }
+                    sh """
+                        EXISTING_CONTAINER=\$(docker ps -a --filter name=${containerName} --format '{{.Names}}')
+                        if [ -n "\$EXISTING_CONTAINER" ]; then
+                            echo "[INFO] Removing existing container \$EXISTING_CONTAINER..."
+                            docker rm -f \$EXISTING_CONTAINER || true
+                        fi
+                        docker run -d --name ${containerName} --network ${DOCKER_NETWORK} \
+                            -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=password \
+                            -e MONGO_INITDB_DATABASE=test_db mongo:6.0
+                    """
                 }
             }
         }
@@ -92,33 +78,15 @@ pipeline {
         stage('Backend Unit Tests') {
             steps {
                 script {
-                    echo "[INFO] 📦 Installing backend dependencies..."
-
-                    sh '''
-                        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-                            echo "[WAIT] 🔄 Un processus APT est en cours. En attente..."
-                            sleep 5
-                        done
-
-                        apt-get update -y
-                        DEBIAN_FRONTEND=noninteractive apt-get install -y libssl3 curl git ca-certificates gnupg mongodb-org-shell
-
-                        echo "[INFO] ✅ Dependencies installed."
-                    '''
-
-                    echo "[INFO] Installing Node.js and npm..."
-                    sh '''
-                        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 
-                        DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
-                        node -v
-                        npm -v
-                    '''
-
-                    echo "[INFO] 🧪 Running backend unit tests..."
-                    sh '''
-                        npm install
-                        npm run test
-                    '''
+                    echo "[INFO] Running backend unit tests using Docker Node.js image..."
+                    docker.image('node:20').inside {
+                        dir("${env.WORKSPACE}") {
+                            // Assurez-vous que vous êtes dans le répertoire des tests
+                            echo "[INFO] 🧪 Running backend unit tests..."
+                            sh 'npm ci'  // Utilisation de npm ci pour un environnement plus stable
+                            sh 'npm run test'
+                        }
+                    }
                 }
             }
         }
@@ -127,8 +95,8 @@ pipeline {
             steps {
                 script {
                     docker.image('node:20').inside {
-                        dir('frontend') {
-                            echo "📦 Installing frontend deps"
+                        dir("${env.WORKSPACE}/frontend") {
+                            echo "[INFO] 📦 Installing frontend deps"
                             sh 'npm ci'
                             echo "🧪 Running frontend tests"
                             sh 'CI=true npm test -- --watchAll=false'
