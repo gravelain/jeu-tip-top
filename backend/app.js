@@ -3,7 +3,8 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const connectDB = require("./src/config/db"); // Assure-toi que ce fichier exporte juste connectDB sans l'appeler directement
+
+const { connectDB } = require("./src/config/db"); // Importation de connectDB depuis l'objet exporté
 
 const authRoutes = require("./src/routes/authRoute");
 const userRoutes = require("./src/routes/userRoute");

@@ -56,29 +56,33 @@ pipeline {
                 script {
                     echo "[INFO] Starting MongoDB container for testing..."
 
+                    // Générer un nom unique pour le conteneur MongoDB en fonction de BUILD_ID
+                    def containerName = "mongodb-test-${BUILD_ID}"
+
                     // Supprimer le conteneur mongodb-test s'il existe déjà
-                    sh '''
-                        EXISTING_CONTAINER=$(docker ps -a --filter "name=mongodb-test" --format "{{.Names}}")
-                        if [ -n "$EXISTING_CONTAINER" ]; then
+                    sh """
+                        EXISTING_CONTAINER=\$(docker ps -a --filter "name=${containerName}" --format "{{.Names}}")
+                        if [ -n "\$EXISTING_CONTAINER" ]; then
                             echo "[INFO] Removing existing mongodb-test container..."
-                            docker rm -f mongodb-test || true
+                            docker rm -f \$EXISTING_CONTAINER || true
                         fi
-                        # Assurez-vous que le conteneur est supprimé avant de le recréer
-                        while docker ps -a --filter "name=mongodb-test" --format "{{.Names}}" | grep -q "mongodb-test"; do
-                            echo "[INFO] Waiting for mongodb-test container to be removed..."
+
+                        // Assurez-vous que le conteneur est bien supprimé avant de le recréer
+                        while docker ps -a --filter "name=${containerName}" --format "{{.Names}}" | grep -q "${containerName}"; do
+                            echo "[INFO] Waiting for ${containerName} container to be removed..."
                             sleep 2
                         done
-                    '''
-                    
-                    // Créer et démarrer le nouveau conteneur mongodb-test
-                    sh '''
-                        docker run -d --name mongodb-test \
+                    """
+
+                    // Créer et démarrer le nouveau conteneur MongoDB avec un nom unique
+                    sh """
+                        docker run -d --name ${containerName} \
                             --network ${DOCKER_NETWORK} \
                             -e MONGO_INITDB_ROOT_USERNAME=root \
                             -e MONGO_INITDB_ROOT_PASSWORD=password \
                             -e MONGO_INITDB_DATABASE=test_db \
                             mongo:6.0
-                    '''
+                    """
                 }
             }
         }
@@ -219,7 +223,7 @@ pipeline {
                 sh """
                     docker rm -f ${backendName} || true
                     docker rm -f ${frontendName} || true
-                    docker rm -f mongodb-test || true
+                    docker rm -f mongodb-test-${BUILD_ID} || true
                     docker logout || true
                     docker system prune -f || true
                 """
