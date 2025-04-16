@@ -83,7 +83,7 @@ pipeline {
                         dir("${env.WORKSPACE}") {
                             // Assurez-vous que vous êtes dans le répertoire des tests
                             echo "[INFO] 🧪 Running backend unit tests..."
-                            sh 'npm ci'  // Utilisation de npm ci pour un environnement plus stable
+                            sh 'npm install'
                             sh 'npm run test'
                         }
                     }
