@@ -45,9 +45,12 @@ pipeline {
         stage('Ensure Docker Network') {
             steps {
                 sh '''
-                    docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1 || \
+                    if ! docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1; then
+                        echo "[INFO] 🛠 Creating missing Docker network '${DOCKER_NETWORK}'..."
                         docker network create ${DOCKER_NETWORK}
-                    echo "[INFO] ✅ Docker network '${DOCKER_NETWORK}' is ready."
+                    else
+                        echo "[INFO] ✅ Docker network '${DOCKER_NETWORK}' already exists."
+                    fi
                 '''
             }
         }
@@ -92,10 +95,18 @@ pipeline {
                     echo "[INFO] 📦 Installing backend dependencies..."
 
                     sh '''
-                        apt-get update -y
-
                         while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
                             echo "[WAIT] 🔄 Un processus APT est en cours. En attente..."
+                            sleep 5
+                        done
+
+                        for i in {1..5}; do
+                            # Nettoyage des verrous APT existants
+                            rm -f /var/lib/apt/lists/lock
+                            rm -f /var/lib/dpkg/lock-frontend
+                            rm -f /var/cache/apt/archives/lock
+
+                            apt-get update -y && break || echo "[INFO] Retry $i: apt-get update failed, retrying..."
                             sleep 5
                         done
 
