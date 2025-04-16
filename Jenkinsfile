@@ -158,31 +158,34 @@ pipeline {
 
         stage('Deploy Docker Containers') {
             steps {
-                script {
-                    def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
-                    def frontendName = "${IMAGE_NAME}-frontend-${env.BRANCH_NAME}"
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    script {
+                        def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
+                        def frontendName = "${IMAGE_NAME}-frontend-${env.BRANCH_NAME}"
 
-                    sh """
-                        echo "[CLEANUP] 🧹 Removing old containers if any..."
-                        docker rm -f ${backendName} || true
-                        docker rm -f ${frontendName} || true
+                        sh """
+                            echo "[CLEANUP] 🧹 Removing old containers if any..."
+                            docker rm -f ${backendName} || true
+                            docker rm -f ${frontendName} || true
 
-                        echo "[DEPLOY] 🚀 Running backend container..."
-                        docker run -d \
-                            --env-file ${env.ENV_FILE} \
-                            --network ${DOCKER_NETWORK} \
-                            --name ${backendName} \
-                            $DOCKER_REGISTRY/${DOCKER_USER}/${IMAGE_NAME}-backend:$DOCKER_TAG
+                            echo "[DEPLOY] 🚀 Running backend container..."
+                            docker run -d \
+                                --env-file ${env.ENV_FILE} \
+                                --network ${DOCKER_NETWORK} \
+                                --name ${backendName} \
+                                $DOCKER_REGISTRY/${DOCKER_USER}/${IMAGE_NAME}-backend:$DOCKER_TAG
 
-                        echo "[DEPLOY] 🚀 Running frontend container..."
-                        docker run -d \
-                            --network ${DOCKER_NETWORK} \
-                            --name ${frontendName} \
-                            $DOCKER_REGISTRY/${DOCKER_USER}/${IMAGE_NAME}-frontend:$DOCKER_TAG
-                    """
+                            echo "[DEPLOY] 🚀 Running frontend container..."
+                            docker run -d \
+                                --network ${DOCKER_NETWORK} \
+                                --name ${frontendName} \
+                                $DOCKER_REGISTRY/${DOCKER_USER}/${IMAGE_NAME}-frontend:$DOCKER_TAG
+                        """
+                    }
                 }
             }
         }
+
     }
 
     post {
