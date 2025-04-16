@@ -138,24 +138,23 @@ pipeline {
                         def tag = "${env.BRANCH_NAME}-${timestamp}"
                         env.DOCKER_TAG = tag
 
-                        echo "[BUILD] 🐳 Building backend..."
-                        sh "docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend"
-
-                        // Login Docker Hub
-                        sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
-
-                        echo "[BUILD] 🐳 Building frontend..."
-                        sh "docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend"
-
-                        echo "[PUSH] 🚀 Pushing backend image..."
-                        sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG"
+                        echo "[BUILD] 🐳 Building and pushing backend image..."
+                        sh """
+                            docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend
+                            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+                            docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
+                        """
                         
-                        echo "[PUSH] 🚀 Pushing frontend image..."
-                        sh "docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG"
+                        echo "[BUILD] 🐳 Building and pushing frontend image..."
+                        sh """
+                            docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend
+                            docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG
+                        """
                     }
                 }
             }
         }
+
 
         stage('Deploy Docker Containers') {
             steps {
