@@ -41,7 +41,6 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     script {
-                        env.DOCKER_USER = DOCKER_USER // 👈 Correction ici
                         sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                     }
                 }
@@ -78,12 +77,13 @@ pipeline {
         stage('Backend Unit Tests') {
             steps {
                 script {
-                    docker.image('node:20').inside {
+                    docker.image('node:20-bullseye').inside {
                         dir('backend') {
                             echo "📦 Installing backend deps"
+                            sh 'apt-get update && apt-get install -y libcurl4' // ✅ Ajout lib manquante
                             sh 'npm ci'
                             echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
-                            sh "NODE_ENV=${env.NODE_ENV} npm run test"
+                            sh "NODE_ENV=test npm run test"
                         }
                     }
                 }
