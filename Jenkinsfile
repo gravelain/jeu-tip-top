@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        ansiColor('xterm')
+    }
+
     environment {
         NODE_VERSION     = '20'
         DOCKER_REGISTRY  = 'docker.io'
@@ -14,6 +19,7 @@ pipeline {
     }
 
     stages {
+
         stage('Clean & Checkout') {
             steps {
                 deleteDir()
@@ -26,15 +32,21 @@ pipeline {
         stage('Set NODE_ENV') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == 'prod') {
-                        env.NODE_ENV = 'production'
-                    } else if (env.BRANCH_NAME == 'preprod') {
-                        env.NODE_ENV = 'preprod'
-                    } else {
-                        env.NODE_ENV = 'development'
-                    }
+                    env.NODE_ENV = (env.BRANCH_NAME == 'prod') ? 'production' :
+                                   (env.BRANCH_NAME == 'preprod') ? 'preprod' : 'development'
+                    env.ENV_FILE = ".env.${env.NODE_ENV}"
                     echo "🔧 NODE_ENV set to: ${env.NODE_ENV}"
+                    echo "📄 ENV_FILE: ${env.ENV_FILE}"
                 }
+            }
+        }
+
+        stage('Check Docker Availability') {
+            steps {
+                sh '''
+                    echo "[CHECK] 🔍 Checking Docker..."
+                    docker --version || (echo "[ERROR] ❌ Docker non disponible sur l'agent !" && exit 1)
+                '''
             }
         }
 
@@ -42,7 +54,7 @@ pipeline {
             steps {
                 sh '''
                     if ! docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1; then
-                        echo "[INFO] 🛠 Creating missing Docker network '${DOCKER_NETWORK}'..."
+                        echo "[INFO] 🛠️ Creating missing Docker network '${DOCKER_NETWORK}'..."
                         docker network create ${DOCKER_NETWORK}
                     else
                         echo "[INFO] ✅ Docker network '${DOCKER_NETWORK}' already exists."
@@ -54,19 +66,12 @@ pipeline {
         stage('Start MongoDB Service for Tests') {
             steps {
                 script {
-                    echo "[INFO] Starting MongoDB container for testing..."
-
                     def containerName = "mongodb-test-${BUILD_ID}"
-
                     withEnv(["MONGO_CONTAINER_NAME=${containerName}"]) {
                         sh '''
                             echo "[DEBUG] Container name: $MONGO_CONTAINER_NAME"
 
-                            EXISTING_CONTAINER=$(docker ps -a --filter "name=$MONGO_CONTAINER_NAME" --format "{{.Names}}")
-                            if [ -n "$EXISTING_CONTAINER" ]; then
-                                echo "[INFO] Removing existing mongodb-test container..."
-                                docker rm -f $EXISTING_CONTAINER || true
-                            fi
+                            docker rm -f $MONGO_CONTAINER_NAME || true
 
                             while docker ps -a --filter "name=$MONGO_CONTAINER_NAME" --format "{{.Names}}" | grep -q "$MONGO_CONTAINER_NAME"; do
                                 echo "[INFO] Waiting for $MONGO_CONTAINER_NAME container to be removed..."
@@ -89,34 +94,23 @@ pipeline {
             steps {
                 script {
                     echo "[INFO] 📦 Installing backend dependencies..."
-
-                    // Mise à jour des dépôts et installation des dépendances système
                     sh '''
                         apt-get update -y
-                        apt-get upgrade -y
-                        dpkg -l | grep -qw apt-utils || apt-get install -y apt-utils
-                        apt-get install -y libssl3 curl git ca-certificates gnupg
 
-                        echo "[INFO] 🧩 Ajout du dépôt MongoDB..."
-                        curl -fsSL https://pgp.mongodb.com/server-6.0.asc | gpg --batch --dearmor -o /tmp/mongodb-server-6.0.gpg
-                        echo "deb [signed-by=/tmp/mongodb-server-6.0.gpg] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" > /etc/apt/sources.list.d/mongodb-org-6.0.list
-                        apt-get update -y
-                        apt-get install -y mongodb-org-shell
+                        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+                            echo "[WAIT] 🔄 Un processus APT est en cours. En attente..."
+                            sleep 5
+                        done
 
-                        echo "[INFO] ✅ Dependencies installed."
-                    '''
+                        DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+                        apt-get install -y apt-utils libssl3 curl git ca-certificates gnupg
 
-                    // Installation de Node.js et npm
-                    echo "[INFO] Installing Node.js and npm..."
-                    sh '''
-                        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 
-                        apt-get install -y nodejs
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+                        DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+
                         node -v
                         npm -v
-                    '''
 
-                    echo "[INFO] 🧪 Running backend unit tests..."
-                    sh '''
                         npm install
                         npm run test
                     '''
@@ -143,18 +137,16 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                        script {
-                            sh '''
-                                docker run --rm \
-                                    -e SONAR_HOST_URL=$SONAR_HOST_URL \
-                                    -e SONAR_AUTH_TOKEN=$SONAR_AUTH_TOKEN \
-                                    -v $(pwd):/usr/src \
-                                    sonarsource/sonar-scanner-cli:latest \
-                                    -Dsonar.projectKey=tip-top-game \
-                                    -Dsonar.sources=. \
-                                    -Dsonar.login=$SONAR_AUTH_TOKEN
-                            '''
-                        }
+                        sh '''
+                            docker run --rm \
+                                -e SONAR_HOST_URL=$SONAR_HOST_URL \
+                                -e SONAR_AUTH_TOKEN=$SONAR_AUTH_TOKEN \
+                                -v $(pwd):/usr/src \
+                                sonarsource/sonar-scanner-cli:latest \
+                                -Dsonar.projectKey=tip-top-game \
+                                -Dsonar.sources=. \
+                                -Dsonar.login=$SONAR_AUTH_TOKEN
+                        '''
                     }
                 }
             }
@@ -165,20 +157,21 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     script {
                         def timestamp = new Date().format("yyyyMMddHHmmss")
-                        def tag = "${env.BRANCH_NAME}-${timestamp}"
-                        env.DOCKER_TAG = tag
+                        env.DOCKER_TAG = "${env.BRANCH_NAME}-${timestamp}"
 
                         echo "[BUILD] 🐳 Building and pushing backend image..."
                         sh '''
                             docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend
                             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
                             docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
+                            echo "[INFO] ✅ Backend image: $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG"
                         '''
 
                         echo "[BUILD] 🐳 Building and pushing frontend image..."
                         sh '''
                             docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend
                             docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG
+                            echo "[INFO] ✅ Frontend image: $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG"
                         '''
                     }
                 }
@@ -192,13 +185,13 @@ pipeline {
                     def frontendName = "${IMAGE_NAME}-frontend-${env.BRANCH_NAME}"
 
                     sh '''
-                        echo "[CLEANUP] 🧹 Removing old containers if any..."
+                        echo "[CLEANUP] 🧹 Removing old containers..."
                         docker rm -f ${backendName} || true
                         docker rm -f ${frontendName} || true
 
                         echo "[DEPLOY] 🚀 Running backend container..."
                         docker run -d \
-                            --env-file ${env.ENV_FILE} \
+                            --env-file ${ENV_FILE} \
                             --network ${DOCKER_NETWORK} \
                             --name ${backendName} \
                             $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
@@ -218,9 +211,9 @@ pipeline {
                 script {
                     def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
                     sh '''
-                        echo "[INFO] 📦 Creating MongoDB backup..."
-                        docker exec ${backendName} \
-                            mongodump --archive=/backup/${IMAGE_NAME}-${BRANCH_NAME}.gz --gzip || echo '[WARN] Backup failed (maybe mongod not running?)'
+                        mkdir -p ./mongo_backups
+                        docker exec ${backendName} mongodump --archive=/tmp/backup.gz --gzip || echo '[WARN] Backup failed.'
+                        docker cp ${backendName}:/tmp/backup.gz ./mongo_backups/${IMAGE_NAME}-${BRANCH_NAME}-$(date +%F-%H%M%S).gz || echo '[WARN] No backup to copy.'
                     '''
                 }
             }
@@ -238,6 +231,7 @@ pipeline {
                     docker rm -f ${frontendName} || true
                     docker rm -f mongodb-test-${BUILD_ID} || true
                     docker logout || true
+                    docker image prune -af || true
                     docker system prune -f || true
                 '''
             }
