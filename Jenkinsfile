@@ -10,8 +10,6 @@ pipeline {
         DOCKER_NETWORK   = 'tiptopgame_net'
         TIMEZONE         = 'Europe/Paris'
         TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
-        DOCKER_USER      = '' // Variable DOCKER_USER initialisée globalement
-        DOCKER_PASS      = '' // Variable DOCKER_PASS initialisée globalement
         SONARQUBE_TOKEN  = '' // Variable pour SonarQube
     }
 
@@ -40,18 +38,14 @@ pipeline {
             }
         }
 
-        stage('Docker Login') {
+        stage('Docker Login (Automatic via Jenkins Credentials)') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER_CRED', passwordVariable: 'DOCKER_PASS_CRED')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     script {
-                        // Affecte les variables globales de manière explicite
-                        env.DOCKER_USER = DOCKER_USER_CRED
-                        env.DOCKER_PASS = DOCKER_PASS_CRED
+                        // Docker se connecte automatiquement via Jenkins credentials
+                        echo "[DEBUG] Docker credentials injected: User: ${env.DOCKER_USER}"
 
-                        echo "[DEBUG] DOCKER_USER: ${env.DOCKER_USER}"  // Debug pour vérifier la variable
-                        echo "[DEBUG] DOCKER_PASS: ${env.DOCKER_PASS}"
-
-                        sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                        // Pas besoin de faire docker login, Jenkins s'en charge via le credentials
                     }
                 }
             }
@@ -144,8 +138,6 @@ pipeline {
                     env.DOCKER_TAG = tag
 
                     echo "[BUILD] 🐳 Building backend..."
-                    // Debug de la variable DOCKER_USER
-                    echo "[DEBUG] DOCKER_USER: ${env.DOCKER_USER}"
                     sh "docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend"
 
                     echo "[BUILD] 🐳 Building frontend..."
