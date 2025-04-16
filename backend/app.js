@@ -32,12 +32,13 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://www.dsp5-archi-f24a-15m-g3.fr",
   "https://www.dsp5-archi-f24a-15m-g3.fr",
+  "https://dsp5-archi-f24a-15m-g3.fr",
 ];
 
 // CORS config
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.some(allowedOrigin => allowedOrigin.toLowerCase() === origin.toLowerCase())) {
       return callback(null, true);
     }
     const msg = `❌ CORS : L'origine '${origin}' n'est pas autorisée.`;
