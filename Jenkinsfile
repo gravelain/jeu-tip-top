@@ -10,11 +10,7 @@ pipeline {
         DOCKER_NETWORK   = 'tiptopgame_net'
         TIMEZONE         = 'Europe/Paris'
         TRAEFIK_EMAIL    = 'thierry.temgoua98@gmail.com'
-        SONARQUBE_TOKEN  = ''
-    }
-
-    options {
-        timestamps()
+        SONARQUBE_TOKEN  = '' // Variable pour SonarQube
     }
 
     stages {
@@ -59,18 +55,24 @@ pipeline {
             steps {
                 script {
                     echo "[INFO] Starting MongoDB container for testing..."
-                    def containerName = "mongodb-test-${BUILD_ID}"
 
-                    sh """
-                        EXISTING_CONTAINER=\$(docker ps -a --filter name=${containerName} --format '{{.Names}}')
-                        if [ -n "\$EXISTING_CONTAINER" ]; then
-                            echo "[INFO] Removing existing container \$EXISTING_CONTAINER..."
-                            docker rm -f \$EXISTING_CONTAINER || true
+                    // Supprimer le conteneur mongodb-test s'il existe déjà
+                    sh '''
+                        if docker ps -a --filter "name=mongodb-test" --format "{{.Names}}" | grep -q "mongodb-test"; then
+                            echo "[INFO] Removing existing mongodb-test container..."
+                            docker rm -f mongodb-test || true
                         fi
-                        docker run -d --name ${containerName} --network ${DOCKER_NETWORK} \
-                            -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=password \
-                            -e MONGO_INITDB_DATABASE=test_db mongo:6.0
-                    """
+                    '''
+                    
+                    // Créer et démarrer le nouveau conteneur mongodb-test
+                    sh '''
+                        docker run -d --name mongodb-test \
+                            --network ${DOCKER_NETWORK} \
+                            -e MONGO_INITDB_ROOT_USERNAME=root \
+                            -e MONGO_INITDB_ROOT_PASSWORD=password \
+                            -e MONGO_INITDB_DATABASE=test_db \
+                            mongo:6.0
+                    '''
                 }
             }
         }
@@ -78,13 +80,13 @@ pipeline {
         stage('Backend Unit Tests') {
             steps {
                 script {
-                    echo "[INFO] Running backend unit tests using Docker Node.js image..."
-                    docker.image('node:20').inside {
-                        dir("${env.WORKSPACE}") {
-                            // Assurez-vous que vous êtes dans le répertoire des tests
-                            echo "[INFO] 🧪 Running backend unit tests..."
-                            sh 'npm install'
-                            sh 'npm run test'
+                    docker.image('node:20-bullseye').inside {
+                        dir('backend') {
+                            echo "📦 Installing backend deps"
+                            sh 'apt-get update && apt-get install -y libcurl4' 
+                            sh 'npm ci'
+                            echo "🔧 Running backend tests with NODE_ENV=${env.NODE_ENV}"
+                            sh "NODE_ENV=test npm run test"
                         }
                     }
                 }
@@ -95,8 +97,8 @@ pipeline {
             steps {
                 script {
                     docker.image('node:20').inside {
-                        dir("${env.WORKSPACE}/frontend") {
-                            echo "[INFO] 📦 Installing frontend deps"
+                        dir('frontend') {
+                            echo "📦 Installing frontend deps"
                             sh 'npm ci'
                             echo "🧪 Running frontend tests"
                             sh 'CI=true npm test -- --watchAll=false'
@@ -111,16 +113,16 @@ pipeline {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         script {
-                            sh '''
+                            sh """
                                 docker run --rm \
-                                    -e SONAR_HOST_URL=$SONAR_HOST_URL \
-                                    -e SONAR_AUTH_TOKEN=$SONAR_AUTH_TOKEN \
-                                    -v $(pwd):/usr/src \
+                                    -e SONAR_HOST_URL=\$SONAR_HOST_URL \
+                                    -e SONAR_AUTH_TOKEN=\$SONAR_AUTH_TOKEN \
+                                    -v \$(pwd):/usr/src \
                                     sonarsource/sonar-scanner-cli:latest \
                                     -Dsonar.projectKey=tip-top-game \
                                     -Dsonar.sources=. \
-                                    -Dsonar.login=$SONAR_AUTH_TOKEN
-                            '''
+                                    -Dsonar.login=\$SONAR_AUTH_TOKEN
+                            """
                         }
                     }
                 }
@@ -136,17 +138,17 @@ pipeline {
                         env.DOCKER_TAG = tag
 
                         echo "[BUILD] 🐳 Building and pushing backend image..."
-                        sh '''
+                        sh """
                             docker build -f backend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG ./backend
                             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
                             docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-backend:$DOCKER_TAG
-                        '''
-
+                        """
+                        
                         echo "[BUILD] 🐳 Building and pushing frontend image..."
-                        sh '''
+                        sh """
                             docker build -f frontend/Dockerfile.prod -t $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG ./frontend
                             docker push $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG
-                        '''
+                        """
                     }
                 }
             }
@@ -158,7 +160,7 @@ pipeline {
                     def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
                     def frontendName = "${IMAGE_NAME}-frontend-${env.BRANCH_NAME}"
 
-                    sh '''
+                    sh """
                         echo "[CLEANUP] 🧹 Removing old containers if any..."
                         docker rm -f ${backendName} || true
                         docker rm -f ${frontendName} || true
@@ -175,7 +177,7 @@ pipeline {
                             --network ${DOCKER_NETWORK} \
                             --name ${frontendName} \
                             $DOCKER_REGISTRY/$DOCKER_USER/${IMAGE_NAME}-frontend:$DOCKER_TAG
-                    '''
+                    """
                 }
             }
         }
@@ -184,11 +186,11 @@ pipeline {
             steps {
                 script {
                     def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
-                    sh '''
+                    sh """
                         echo "[INFO] 📦 Creating MongoDB backup..."
                         docker exec ${backendName} \
                             mongodump --archive=/backup/${IMAGE_NAME}-${BRANCH_NAME}.gz --gzip || echo '[WARN] Backup failed (maybe mongod not running?)'
-                    '''
+                    """
                 }
             }
         }
@@ -200,13 +202,13 @@ pipeline {
             script {
                 def backendName = "${IMAGE_NAME}-backend-${env.BRANCH_NAME}"
                 def frontendName = "${IMAGE_NAME}-frontend-${env.BRANCH_NAME}"
-                sh '''
-                    [ -n "${backendName}" ] && docker rm -f ${backendName} || true
-                    [ -n "${frontendName}" ] && docker rm -f ${frontendName} || true
-                    docker rm -f mongodb-test-${BUILD_ID} || true
+                sh """
+                    docker rm -f ${backendName} || true
+                    docker rm -f ${frontendName} || true
+                    docker rm -f mongodb-test || true
                     docker logout || true
                     docker system prune -f || true
-                '''
+                """
             }
             junit allowEmptyResults: true, testResults: '**/*-test-results.xml'
         }
