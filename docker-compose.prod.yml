@@ -1,4 +1,5 @@
 services:
+  # Traefik (Reverse Proxy)
   traefik:
     image: traefik:v2.11.2
     container_name: traefik
@@ -26,6 +27,7 @@ services:
     networks:
       - web
 
+  # Backend (API)
   backend:
     build:
       context: ./backend
@@ -47,6 +49,7 @@ services:
     networks:
       - web
 
+  # Frontend (React App)
   frontend:
     build:
       context: ./frontend
@@ -66,10 +69,11 @@ services:
       - "traefik.http.routers.frontend.rule=Host(`dsp5-archi-f24a-15m-g3.fr`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=myresolver"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8081"
     networks:
       - web
 
+  # MongoDB
   mongodb:
     image: mongo:6.0
     container_name: tip_top_mongodb
@@ -83,6 +87,7 @@ services:
     networks:
       - web
 
+  # Mongo Express (Interface Web)
   mongo-express:
     image: mongo-express:latest
     container_name: mongo-express
@@ -100,6 +105,7 @@ services:
     networks:
       - web
 
+  # Jenkins
   jenkins:
     image: jenkins/jenkins:lts
     platform: linux/amd64
@@ -119,6 +125,7 @@ services:
     networks:
       - web
 
+  # Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -137,6 +144,7 @@ services:
     networks:
       - web
 
+  # Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -152,6 +160,7 @@ services:
     networks:
       - web
 
+  # SonarQube Database
   sonarqube_db:
     image: postgres:latest
     platform: linux/amd64
@@ -166,6 +175,7 @@ services:
     networks:
       - web
 
+  # SonarQube
   sonarqube:
     image: sonarqube:latest
     platform: linux/amd64
@@ -190,6 +200,7 @@ services:
     networks:
       - web
 
+  # Cadvisor (monitoring)
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     platform: linux/amd64
